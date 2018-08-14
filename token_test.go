@@ -1,14 +1,13 @@
 package sessions
 
 import (
-	"bytes"
 	"crypto/rand"
+	"encoding/base64"
 	"errors"
-	"io"
 	"testing"
 )
 
-var defaultSigningKey = []byte("testsigningkey")
+var testSigningKey = []byte("testsigningkey")
 
 type errorReader struct{}
 
@@ -16,74 +15,53 @@ func (r *errorReader) Read(buf []byte) (int, error) {
 	return 0, errors.New("test error")
 }
 
-func TestNewTokenFromReader(t *testing.T) {
+func TestNewTokenOfLength(t *testing.T) {
 	cases := []struct {
 		name        string
 		length      int
 		signingKey  []byte
-		reader      io.Reader
 		expectError bool
 	}{
 		{
 			"min length",
 			MinIDLength,
-			defaultSigningKey,
-			rand.Reader,
+			testSigningKey,
 			false,
 		},
 		{
 			"default length",
 			DefaultIDLength,
-			defaultSigningKey,
-			rand.Reader,
+			testSigningKey,
 			false,
 		},
 		{
 			"specific length",
 			64,
-			defaultSigningKey,
-			rand.Reader,
+			testSigningKey,
 			false,
 		},
 		{
 			"long length",
 			256,
-			defaultSigningKey,
-			rand.Reader,
+			testSigningKey,
 			false,
 		},
 		{
 			"length too short",
 			MinIDLength - 1,
-			defaultSigningKey,
-			rand.Reader,
+			testSigningKey,
 			true,
 		},
 		{
 			"zero-length key",
 			MinIDLength,
 			[]byte{},
-			rand.Reader,
-			true,
-		},
-		{
-			"nil reader",
-			MinIDLength,
-			defaultSigningKey,
-			nil,
-			true,
-		},
-		{
-			"error from reader",
-			MinIDLength,
-			defaultSigningKey,
-			&errorReader{},
 			true,
 		},
 	}
 
 	for _, c := range cases {
-		token, err := NewRandTokenFromReader(c.length, c.reader, c.signingKey)
+		token, err := NewTokenOfLength(c.signingKey, c.length)
 		//if we expect an error...
 		if c.expectError {
 			//ensure we got one
@@ -103,14 +81,15 @@ func TestNewTokenFromReader(t *testing.T) {
 		}
 
 		//ensure ID is correct length
-		idLen := len(token.ID())
+		idLen := token.ID().Len()
 		if idLen != c.length {
 			t.Errorf("case %s: incorrect ID length: expected %d but got %d", c.name, c.length, idLen)
 		}
 
 		//we can't predict what the ID will be, but ensure that it's not all zeros
 		zeroBuf := make([]byte, c.length)
-		if bytes.Equal(token.ID(), zeroBuf) {
+		b64zb := base64.URLEncoding.EncodeToString(zeroBuf)
+		if token.ID().String() == b64zb {
 			t.Errorf("case %s: ID is all zero bytes", c.name)
 		}
 
@@ -126,13 +105,23 @@ func TestNewTokenFromReader(t *testing.T) {
 			t.Errorf("case %s: error verifying base64-encoded version of token: %v", c.name, err)
 		}
 
-		//verify that buffers match
-		if !bytes.Equal(token.buf, token2.buf) {
-			t.Errorf("case %s: verified token buffer does not match original token buffer: expected %v but got %v",
-				c.name, token.buf, token2.buf)
+		//verify they match
+		if token.String() != token2.String() {
+			t.Errorf("case %s: verified token buffer does not match original token: expected %s but got %s",
+				c.name, token.String(), token2.String())
 		}
 
 	}
+}
+
+func TestNewTokenErrorReadingRandom(t *testing.T) {
+	//use errorReader to simulate an error reading random bytes
+	randReader = &errorReader{}
+	_, err := NewToken(testSigningKey)
+	if err == nil {
+		t.Error("did not receive expected error when simulating error reading random bytes")
+	}
+	randReader = rand.Reader
 }
 
 func TestNewToken(t *testing.T) {
@@ -143,7 +132,7 @@ func TestNewToken(t *testing.T) {
 	}{
 		{
 			"valid key",
-			defaultSigningKey,
+			testSigningKey,
 			false,
 		},
 		{
@@ -154,7 +143,7 @@ func TestNewToken(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		token, err := NewRandToken(c.signingKey)
+		token, err := NewToken(c.signingKey)
 		if c.expectError {
 			if err == nil {
 				t.Errorf("case %s: did not receive expected error", c.name)
@@ -166,7 +155,7 @@ func TestNewToken(t *testing.T) {
 		}
 
 		//ensure ID length is default length
-		idLen := len(token.ID())
+		idLen := token.ID().Len()
 		if idLen != DefaultIDLength {
 			t.Errorf("case %s: incorrect ID length: expected %d but got %d", c.name, DefaultIDLength, idLen)
 		}
@@ -185,12 +174,12 @@ func modToken(token string) string {
 
 func TestVerifyToken(t *testing.T) {
 	//valid token case
-	token, err := NewRandToken(defaultSigningKey)
+	token, err := NewToken(testSigningKey)
 	if err != nil {
 		t.Errorf("unexpected error generating token: %v", err)
 	}
 	tokenString := token.String()
-	_, err = VerifyToken(tokenString, defaultSigningKey)
+	_, err = VerifyToken(tokenString, testSigningKey)
 	if err != nil {
 		t.Errorf("unexpected error verifying valid token: %v", err)
 	}
@@ -204,12 +193,12 @@ func TestVerifyToken(t *testing.T) {
 		{
 			"empty token",
 			"",
-			defaultSigningKey,
+			testSigningKey,
 		},
 		{
 			"invalid base64",
 			"ABC~😜",
-			defaultSigningKey,
+			testSigningKey,
 		},
 		{
 			"zero-length signing key",
@@ -224,7 +213,7 @@ func TestVerifyToken(t *testing.T) {
 		{
 			"modified token",
 			modToken(tokenString),
-			defaultSigningKey,
+			testSigningKey,
 		},
 	}
 
@@ -233,5 +222,21 @@ func TestVerifyToken(t *testing.T) {
 		if err == nil {
 			t.Errorf("case %s: did not receive expected error", c.name)
 		}
+	}
+}
+
+func TestTokenIDString(t *testing.T) {
+	//ensure that the ID string is non-zero length
+	//and can be base64-decoded
+	token, err := NewToken(testSigningKey)
+	if err != nil {
+		t.Fatalf("unexpected error while creating token: %v", err)
+	}
+	id := token.ID().String()
+	if len(id) == 0 {
+		t.Errorf("ID string is zero-length")
+	}
+	if _, err := base64.URLEncoding.DecodeString(id); err != nil {
+		t.Errorf("error base64-decoding ID string: %v", err)
 	}
 }
