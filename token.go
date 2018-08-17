@@ -104,7 +104,7 @@ func VerifyToken(b64token string, signingKey []byte) (Token, error) {
 		return nil, fmt.Errorf("error base64-decoding the token: %v", err)
 	}
 	//if the buffer is not longer than the size of a SHA256 hash + MinIDLength, it can't be valid
-	if len(buf) <= sha256.Size+MinIDLength {
+	if len(buf) < sha256.Size+MinIDLength {
 		return nil, fmt.Errorf("token not long enough")
 	}
 

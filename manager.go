@@ -3,8 +3,10 @@ package sessions
 import (
 	"errors"
 	"fmt"
+	"math/rand"
 	"net/http"
 	"strings"
+	"time"
 )
 
 const headerAuthorization = "Authorization"
@@ -19,6 +21,9 @@ var ErrNoSession = errors.New("no session token")
 //the session token is not supported
 var ErrUnsupportedTokenType = errors.New("unsupported session token type")
 
+//keyIndexGenerator is used to generate random signing key indexes
+var keyIndexGenerator = rand.New(rand.NewSource(time.Now().UnixNano()))
+
 //Manager describes what session managers can do
 type Manager interface {
 	BeginSession(w http.ResponseWriter, sessionState interface{}) (Token, error)
@@ -29,19 +34,21 @@ type Manager interface {
 
 //manager is the concrete implementation of the Manager interface
 type manager struct {
-	idLength   int
-	signingKey []byte
-	store      Store
+	idLength    int
+	signingKeys [][]byte
+	store       Store
 }
 
-//NewManager constructs a new manager. The idLength and signingKey will
-//be used when generating new Tokens in BeginSession(), as well as verifying
-//tokens in GetState(). The store is used to save, get, and delete session state.
-func NewManager(idLength int, signingKey []byte, store Store) Manager {
+//NewManager constructs a new manager. Use idLength to specify a byte length
+//for newly-generate session IDs (see DefaultIDLength). Pass one or more
+//signingKeys to use for signing session tokens--if multiple are provided,
+//the manager will rotate which key is used over time. The store will be
+//used to save, get, and delete session state associated with tokens.
+func NewManager(idLength int, signingKeys [][]byte, store Store) Manager {
 	return &manager{
-		idLength:   idLength,
-		signingKey: signingKey,
-		store:      store,
+		idLength:    idLength,
+		signingKeys: signingKeys,
+		store:       store,
 	}
 }
 
@@ -49,7 +56,8 @@ func NewManager(idLength int, signingKey []byte, store Store) Manager {
 //The new Token for the session is returned, or an error if a problem occurs.
 func (m *manager) BeginSession(w http.ResponseWriter, sessionState interface{}) (Token, error) {
 	//generate a new token
-	tk, err := NewTokenOfLength(m.signingKey, m.idLength)
+	keyidx := keyIndexGenerator.Intn(len(m.signingKeys))
+	tk, err := NewTokenOfLength(m.signingKeys[keyidx], m.idLength)
 	if err != nil {
 		return nil, fmt.Errorf("error generating new token: %v", err)
 	}
@@ -86,7 +94,15 @@ func (m *manager) GetState(r *http.Request, sessionState interface{}) (Token, er
 	}
 
 	//verify the token that follows the "Bearer " prefix
-	tk, err := VerifyToken(authHeader[len(authTypeBearer)+1:], m.signingKey)
+	b64tk := authHeader[len(authTypeBearer)+1:]
+	var tk Token
+	var err error
+	for _, key := range m.signingKeys {
+		tk, err = VerifyToken(b64tk, key)
+		if err == nil {
+			break
+		}
+	}
 	if err != nil {
 		return nil, fmt.Errorf("error verifying session token: %v", err)
 	}
