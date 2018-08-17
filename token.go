@@ -40,7 +40,9 @@ type id struct {
 //that is safe to transport over HTTPS, and use VerifyToken to verify
 //a base64-encoded token sent by the client.
 type Token interface {
+	//String returns a base64-encoded version of the entire token
 	String() string
+	//ID returns a read-only interface to the ID portion of the token
 	ID() ID
 }
 
@@ -63,9 +65,8 @@ func NewToken(signingKey []byte) (Token, error) {
 }
 
 //NewTokenOfLength constructs a new Token using idLength as the length of the session ID
-//in bytes (must be >= MinIDLength). The ID bytes will be read from sessions.RandReader, which
-//can be reset if you want to use something other than the reader from crypto/rand.
-//The signingKey must be non-zero length, and will be used with the HMAC algorithm to digitally sign the ID.
+//in bytes (must be >= MinIDLength). The signingKey must be non-zero length,
+//and will be used with the HMAC algorithm to digitally sign the ID.
 func NewTokenOfLength(signingKey []byte, idLength int) (Token, error) {
 	//preconditions:
 	// - len(signingKey) > 0
@@ -102,8 +103,8 @@ func VerifyToken(b64token string, signingKey []byte) (Token, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error base64-decoding the token: %v", err)
 	}
-	//if the buffer is not longer than the size of a SHA256 hash, it can't be valid
-	if len(buf) <= sha256.Size {
+	//if the buffer is not longer than the size of a SHA256 hash + MinIDLength, it can't be valid
+	if len(buf) <= sha256.Size+MinIDLength {
 		return nil, fmt.Errorf("token not long enough")
 	}
 

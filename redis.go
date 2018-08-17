@@ -12,7 +12,7 @@ import (
 //NewRedisPool constructs a redis.Pool with defaults that should work
 //well in most situations. If the pool returns a connection that has beeen
 //idle for testAfterIdle or longer, it will be health-tested by executing a PING.
-//Set testAfterIdle to 0 to always health-test existing connections.
+//Set testAfterIdle to 0 to always health-test existing connections before they are returned.
 //Callers may adjust any settings on the returned pool before passing it to NewRedisStore().
 func NewRedisPool(addr string, testAfterIdle time.Duration) *redis.Pool {
 	return &redis.Pool{
@@ -31,9 +31,10 @@ func NewRedisPool(addr string, testAfterIdle time.Duration) *redis.Pool {
 	}
 }
 
-//RedisStore represents a session.Store backed by redis.
+//RedisStore represents a Store backed by redis.
 type RedisStore struct {
-	//Used for key expiry time on redis.
+	//Used for key expiry time on redis. Callers
+	//may adjust this after construction.
 	SessionDuration time.Duration
 	//redis conection pool
 	pool *redis.Pool
@@ -47,10 +48,8 @@ func NewRedisStore(pool *redis.Pool, sessionDuration time.Duration) *RedisStore 
 	}
 }
 
-//Save saves the provided session state into the store, associated with
-//the provided session token. The `sessionState` paramater can be any value
-//you want to save, typically a struct with fields for all the various session
-//data you want to track.
+//Save saves the provided sessionState into the store, associated with
+//the provided session token. The sessionState must be gob-encodable.
 func (rs *RedisStore) Save(token Token, sessionState interface{}) error {
 	//gob-encode the session state
 	buf := bytes.NewBuffer(nil)
@@ -72,7 +71,7 @@ func (rs *RedisStore) Save(token Token, sessionState interface{}) error {
 
 //Get gets the session state associated with the provided session token,
 //and resets the expiry time. The previously-stored state will be decoded
-//into the sessionState value, so that must be passed as a pointer.
+//into the sessionState value, so that must be passed by reference.
 func (rs *RedisStore) Get(token Token, sessionState interface{}) error {
 	conn := rs.pool.Get()
 	defer conn.Close()
