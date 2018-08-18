@@ -1,6 +1,9 @@
 # Go Sessions
 
-This package is a simple, modular sessions package for Go web services. Key features include:
+[![Build Status](https://travis-ci.org/davestearns/sessions.png?branch=master)](https://travis-ci.org/davestearns/sessions)
+[![GoDoc](https://godoc.org/github.com/davestearns/sessions?status.png)](https://godoc.org/github.com/davestearns/sessions)
+
+A simple, modular sessions package for Go web services. Key features include:
 
 - Very simple to integrate and use
 - Modular design so you can use as much or as little as you wish
