@@ -32,9 +32,15 @@ import (
 
 func main() {
     redisAddr := // ... network address of your redis server
-    store := sessions.NewRedisStore(sessions.NewRedisPool(redisAddr), time.Hour)
+    store := sessions.NewRedisStore(
+        sessions.NewRedisPool(redisAddr, time.Minute*5), 
+        time.Hour)
 }
 ```
+
+The `NewRedisPool()` function creates a new `redis.Pool` instance that is configured with defaults that should work well in most situations. The time duration passed as the second parameter controls when the pool will do a health check on the connection: if the connection has been idle for longer than the duration, the pool will execute a `PING` request to ensure that the connection is still alive.
+
+The time duration passed as the second parameter to `NewRedisStore()` controls the time-to-live for session state. The TTL is reset each time you get the state, so this controls how long idle sessions will remain before expiring.
 
 Next, construct a `Manager` and give it your token signing key(s), along with your store. The keys are used to digitally sign the session tokens returned to clients, so that we can easily detect attempts to modify the token to session-hop. If you supply more than one key, the manager will rotate which key it uses, making it harder for an attacker to crack your signing key.
 
