@@ -86,19 +86,12 @@ func SomeStatefulHandler(w http.ResponseWriter, r *http.Request) {
 
 ### Ending Sessions
 
-To end a session, simply call `manager.EndSession()`. This will delete the session state from the `Store`, which will cause the current token to be treated as invalid on all subsequent requests.
+To end a session, simply call `manager.EndSession()` passing the current request. This will get and verify the token from the request, and then delete the session state from the `Store`. Once the token and associated session state is deleted, the token will be treated as invalid on all subsequent requests.
 
 ```go
 func SignOutHandler(w http.ResponseWriter, r *http.Request) {
-    //get the current session state and token to ensure there is an active session
-    sessionState := &SessionState{}
-    token, err := manager.GetState(r, sessionState)
-    if err != nil {
-        //...handle error...
-    }
-
-    //end the session associated with the token
-    if err := manager.EndSession(token); err != nil {
+    //end the current session
+    if err := manager.EndSession(r); err != nil {
         //...handle error...
     }
 }
@@ -106,7 +99,7 @@ func SignOutHandler(w http.ResponseWriter, r *http.Request) {
 
 ## Modular Usage
 
-If you don't want to use the `Manager` object, you can instead use the `Token` and `Store` objects directly. This allows you to include the session token in the response in other ways (e.g. a cookie, or in the response body). For example:
+The `Manager` object uses the `Authorization` HTTP header to transmit the session token. If you would prefer to use a different header, or perhaps a cookie, you can use the `Token` and `Store` objects directly. For example:
 
 ```go
 func SignInHandler(w http.ResponseWriter, r *http.Request) {

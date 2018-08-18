@@ -235,7 +235,9 @@ func TestManagerEndSession(t *testing.T) {
 	store.Save(token, expectedState)
 
 	mgr := NewManager(DefaultIDLength, [][]byte{testSigningKey}, store)
-	if err := mgr.EndSession(token); err != nil {
+	req := httptest.NewRequest("GET", "http://example.com", nil)
+	req.Header.Add(headerAuthorization, fmt.Sprintf("%s %s", authTypeBearer, token.String()))
+	if err := mgr.EndSession(req); err != nil {
 		t.Errorf("unexpected error ending session: %v", err)
 	}
 	var actualState string
@@ -243,8 +245,15 @@ func TestManagerEndSession(t *testing.T) {
 		t.Error("did not receive expected error when trying to get state after EndSession()")
 	}
 
+	//trigger an error from the store
 	store.triggerError = true
-	if err := mgr.EndSession(token); err == nil {
+	if err := mgr.EndSession(req); err == nil {
+		t.Error("did nto receive triggered error from store")
+	}
+
+	//try to end when there is no session token and ensure we get an error
+	req.Header.Del(headerAuthorization)
+	if err := mgr.EndSession(req); err == nil {
 		t.Error("did nto receive triggered error from store")
 	}
 }

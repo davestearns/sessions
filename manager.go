@@ -13,9 +13,9 @@ const headerAuthorization = "Authorization"
 const paramAuthorization = "auth"
 const authTypeBearer = "Bearer"
 
-//ErrNoSession is returned from GetState and EndSession
+//ErrNoToken is returned from GetState and EndSession
 //when there is no session token in the provided request
-var ErrNoSession = errors.New("no session token")
+var ErrNoToken = errors.New("no session token")
 
 //ErrUnsupportedTokenType is returned when the type prefix for
 //the session token is not supported
@@ -27,9 +27,10 @@ var keyIndexGenerator = rand.New(rand.NewSource(time.Now().UnixNano()))
 //Manager describes what session managers can do
 type Manager interface {
 	BeginSession(w http.ResponseWriter, sessionState interface{}) (Token, error)
+	GetToken(r *http.Request) (Token, error)
 	GetState(r *http.Request, sessionState interface{}) (Token, error)
 	UpdateState(token Token, sessionState interface{}) error
-	EndSession(token Token) error
+	EndSession(r *http.Request) error
 }
 
 //manager is the concrete implementation of the Manager interface
@@ -71,11 +72,11 @@ func (m *manager) BeginSession(w http.ResponseWriter, sessionState interface{}) 
 	return tk, nil
 }
 
-//GetState gets and validates the session Token, populates sessionState from the Store,
-//and returns the Token. ErrNoSession is returned if there is no session token.
+//GetToken gets the Token (if any) from the request.
+//ErrNoToken is returned if there is no session token.
 //ErrUnsupportedTokenType is returned if the token type is unsupported. Currently, we
 //only support "Bearer" tokens.
-func (m *manager) GetState(r *http.Request, sessionState interface{}) (Token, error) {
+func (m *manager) GetToken(r *http.Request) (Token, error) {
 	//get the Authorization header
 	authHeader := r.Header.Get(headerAuthorization)
 	//if empty, fallback to the query string parameter
@@ -85,7 +86,7 @@ func (m *manager) GetState(r *http.Request, sessionState interface{}) (Token, er
 
 	//if still empty, return appropriate error
 	if len(authHeader) == 0 {
-		return nil, ErrNoSession
+		return nil, ErrNoToken
 	}
 
 	//ensure it has the Bearer prefix
@@ -107,6 +108,17 @@ func (m *manager) GetState(r *http.Request, sessionState interface{}) (Token, er
 		return nil, fmt.Errorf("error verifying session token: %v", err)
 	}
 
+	return tk, nil
+}
+
+//GetState gets and validates the session Token, populates sessionState from the Store,
+//and returns the Token.
+func (m *manager) GetState(r *http.Request, sessionState interface{}) (Token, error) {
+	tk, err := m.GetToken(r)
+	if err != nil {
+		return nil, err
+	}
+
 	//get the associated session state
 	if err := m.store.Get(tk, sessionState); err != nil {
 		return nil, fmt.Errorf("error getting session state: %v", err)
@@ -120,6 +132,10 @@ func (m *manager) UpdateState(token Token, sessionState interface{}) error {
 }
 
 //EndSession deletes the session state associated with the token.
-func (m *manager) EndSession(token Token) error {
-	return m.store.Delete(token)
+func (m *manager) EndSession(r *http.Request) error {
+	tk, err := m.GetToken(r)
+	if err != nil {
+		return err
+	}
+	return m.store.Delete(tk)
 }
