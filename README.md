@@ -64,6 +64,12 @@ func SignInHandler(w http.ResponseWriter, r *http.Request) {
 }
 ```
 
+The `.BeginSession()` method will add an `Authorization` header to the response containing the value `Bearer <token-string>`. The `<token-string>` will be a base64-encoded version of the newly-generated session token. The session ID portion of the token is a series of crypto-random bytes, the length of which is controlled by the `idLength` parameter passed to `sessions.NewManager`. The token also contains an HMAC signature of the ID, which is generated using one of your signing keys.
+
+Clients should hold on to this `Authorization` response header value and send it back to the server with all subsequent requests. The `.GetState()` method described below will extract the session token from the `Authorization` request header, verify it, and fetch the associated state from the store. If the client attempted to modify the token, the HMAC signature verification will fail, an the token will be considered invalid.
+
+This package uses the `Authorization` header instead of a cookie to avoid [CSRF attacks](https://www.owasp.org/index.php/Cross-Site_Request_Forgery_(CSRF)). Since `Authorization` headers are not handled automatically by the browser, they are not susceptible to typical CSRF attacks, but they do require some client-side JavaScript to receive the response header value, and include that value in the `Authorization` header on all subsequent requests.
+
 For strategies on how you can share your global `Manager` instance with your handler functions see [Sharing Values with Go Handlers](https://drstearns.github.io/tutorials/gohandlerctx/).
 
 ### Getting Session State
