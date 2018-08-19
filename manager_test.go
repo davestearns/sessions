@@ -59,7 +59,7 @@ func (ms *mockStore) Delete(token Token) error {
 
 func TestManagerBeginSession(t *testing.T) {
 	store := newMockStore(false)
-	mgr := NewManager(DefaultIDLength, [][]byte{testSigningKey}, store)
+	mgr := NewManager(DefaultIDLength, []string{string(testSigningKey)}, store)
 	respRec := httptest.NewRecorder()
 	state := "test state"
 
@@ -164,7 +164,7 @@ func TestManagerGetState(t *testing.T) {
 		expectedState := "test"
 		c.store.Save(token, expectedState)
 
-		mgr := NewManager(DefaultIDLength, [][]byte{testSigningKey}, c.store)
+		mgr := NewManager(DefaultIDLength, []string{string(testSigningKey)}, c.store)
 
 		var state string
 		actualToken, err := mgr.GetState(c.request, &state)
@@ -206,7 +206,7 @@ func TestManagerUpdateState(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		mgr := NewManager(DefaultIDLength, [][]byte{testSigningKey}, c.store)
+		mgr := NewManager(DefaultIDLength, []string{string(testSigningKey)}, c.store)
 		expectedState := "test"
 		err := mgr.UpdateState(token, expectedState)
 		if c.expectError {
@@ -234,7 +234,7 @@ func TestManagerEndSession(t *testing.T) {
 	expectedState := "test"
 	store.Save(token, expectedState)
 
-	mgr := NewManager(DefaultIDLength, [][]byte{testSigningKey}, store)
+	mgr := NewManager(DefaultIDLength, []string{string(testSigningKey)}, store)
 	req := httptest.NewRequest("GET", "http://example.com", nil)
 	req.Header.Add(headerAuthorization, fmt.Sprintf("%s %s", authTypeBearer, token.String()))
 	if err := mgr.EndSession(req); err != nil {

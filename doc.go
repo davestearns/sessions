@@ -40,7 +40,7 @@ the manager will rotate which key it uses, making it harder for an attacker to
 crack your signing key.
 
 	//load your token signing keys from environment variables or wherever
-	signingKeys := [][]byte{[]byte(os.GetEnv(SIGNKEY_1)), []byte(os.GetEnv(SIGNKEY_2))}
+	signingKeys := []string{os.GetEnv(SIGNKEY_1), os.GetEnv(SIGNKEY_2)}
 	manager := sessions.NewManager(sessions.DefaultIDLength, signingKeys, store)
 
 To begin a session within one of your handler functions, use `manager.BeginSession()`:

@@ -46,7 +46,7 @@ Next, construct a `Manager` and give it your token signing key(s), along with yo
 
 ```go
     //load your token signing keys from environment variables or wherever
-    signingKeys := [][]byte{[]byte(os.GetEnv(SIGNKEY_1)), []byte(os.GetEnv(SIGNKEY_2))}
+    signingKeys := []string{os.GetEnv(SIGNKEY_1), os.GetEnv(SIGNKEY_2)}
     manager := sessions.NewManager(sessions.DefaultIDLength, signingKeys, store)
 ```
 

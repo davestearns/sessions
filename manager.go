@@ -45,10 +45,15 @@ type manager struct {
 //signingKeys to use for signing session tokens--if multiple are provided,
 //the manager will rotate which key is used over time. The store will be
 //used to save, get, and delete session state associated with tokens.
-func NewManager(idLength int, signingKeys [][]byte, store Store) Manager {
+func NewManager(idLength int, signingKeys []string, store Store) Manager {
+	//convert string keys to byte slices
+	bkeys := make([][]byte, len(signingKeys))
+	for i, v := range signingKeys {
+		bkeys[i] = []byte(v)
+	}
 	return &manager{
 		idLength:    idLength,
-		signingKeys: signingKeys,
+		signingKeys: bkeys,
 		store:       store,
 	}
 }
