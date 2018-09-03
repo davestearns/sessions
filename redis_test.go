@@ -94,10 +94,6 @@ func TestNewRedisPool(t *testing.T) {
 		return mockConn, nil
 	}
 
-	//first .Get() on the pool should not PING
-	//but the pool will execute a blank command when
-	//the connection is closed
-	mockConn.Command("")
 	conn := pool.Get()
 	if numDials != 1 {
 		t.Errorf("expected numDials to be 1, but got %d", numDials)
@@ -112,7 +108,6 @@ func TestNewRedisPool(t *testing.T) {
 
 	//second .Get() should PING
 	mockConn.Command("PING").Expect("PONG")
-	mockConn.Command("")
 	conn = pool.Get()
 	if err := conn.Err(); err != nil {
 		t.Errorf("connection returned from Get has error: %v", err)
@@ -125,7 +120,6 @@ func TestNewRedisPool(t *testing.T) {
 	//and if PING returns an error, it should dial a new connection
 	//and give us a new connection without an error
 	mockConn.Command("PING").ExpectError(fmt.Errorf("test error"))
-	mockConn.Command("")
 	conn = pool.Get()
 	if numDials != 2 {
 		t.Errorf("expected numDials to be 2, but got %d", numDials)
@@ -181,9 +175,6 @@ func TestRedisStoreSaveErrors(t *testing.T) {
 }
 
 func getMockPool(conn *redigomock.Conn) *redis.Pool {
-	//the redigo library executes a blank command on connections
-	//just before returning them to the pool
-	conn.GenericCommand("")
 	return &redis.Pool{
 		Dial: func() (redis.Conn, error) { return conn, nil },
 	}
