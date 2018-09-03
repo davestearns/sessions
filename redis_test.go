@@ -2,6 +2,7 @@ package sessions
 
 import (
 	"fmt"
+	"os"
 	"reflect"
 	"testing"
 	"time"
@@ -12,6 +13,10 @@ import (
 )
 
 func TestRedisStoreIntegration(t *testing.T) {
+	redisAddr := os.Getenv("REDIS_ADDR")
+	if len(redisAddr) == 0 {
+		t.Skip("set REDIS_ADDR to run redis store integration test")
+	}
 	token, err := NewToken(testSigningKey)
 	if err != nil {
 		t.Fatalf("unexpected error generating token: %v", err)
@@ -24,7 +29,7 @@ func TestRedisStoreIntegration(t *testing.T) {
 		Reqs int
 	}
 	state := &sessionstate{&user{"tester"}, 0}
-	store := NewRedisStore(NewRedisPool("127.0.0.1:6379", time.Minute*10), time.Hour)
+	store := NewRedisStore(NewRedisPool(redisAddr, time.Minute*10), time.Hour)
 
 	//ensure we get an error when getting before saving
 	stateGet := &sessionstate{}
